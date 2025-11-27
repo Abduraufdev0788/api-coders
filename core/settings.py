@@ -41,11 +41,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    "coders.config.CodersConfig",
-    "contests.config.ContestsConfig",
-    "problems.config.ProblemsConfig",
-    "submissions.config.SubmissionsConfig",
-    "leaderboard.config.LeaderboardConfig",
+
+
+    "app.coders.apps.CodersConfig",
+    "app.contests.apps.ContestsConfig",
+    "app.problems.apps.ProblemsConfig",
+    "app.submissions.apps.SubmissionsConfig",
+    "app.leaderboard.apps.LeaderboardConfig",
 
 ]
 
@@ -53,7 +55,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

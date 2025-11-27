@@ -1,5 +1,6 @@
 from django.urls import path
+from .views import Contests
 
 urlpatterns = [
-    path("")
+    path("contests/", Contests.as_view(), name="contests" )
 ]
