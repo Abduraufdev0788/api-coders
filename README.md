@@ -9,7 +9,7 @@ Barcha ma’lumotlar **JSON** formatida qaytariladi.
 
 ---
 
-## 📦 **Apps Strukturası**
+## 📦 Apps Strukturası
 ```
 contests/       — Contest management
 coders/         — Coder profiles & stats
@@ -20,234 +20,27 @@ leaderboard/    — Rating change & leaderboards
 
 ---
 
-# 🧩 **Models (to‘liq aniqlangan)**
+# 🧩 Models (xulosa)
 
-> **Timestamps:** barcha vaqtlar UTC, API’da ISO-8601 qaytadi.
+> Timestamps: barcha vaqtlar UTC, API’da ISO-8601 qaytadi.
 
----
-
-## `contests.models.Contest`
-```
-id              AutoField(pk)
-title           CharField(200)  [required]
-slug            SlugField(220, unique)
-description     TextField(null=True, blank=True)
-location        CharField(100)
-start_date      DateTimeField [required]
-end_date        DateTimeField [required]
-visibility      CharField(choices=['public','private'], default='public')
-finalized       BooleanField(default=False)
-problems_count  IntegerField(default=0)
-created_at      DateTimeField(auto_now_add=True)
-updated_at      DateTimeField(auto_now=True)
-
-Meta:
-    ordering = ['-start_date']
-
-Constraints:
-    end_date > start_date
-    optional unique: (title, start_date, location)
-
-Delete rule:
-    ❌ Cannot delete if submissions exist → return HTTP 400
-```
+(Full model tafsilotlari READMEning yuqorisida berilgan. Quyida endpointlarga oid misollar batafsil.)
 
 ---
 
-## `coders.models.Coder`
-```
-id                  AutoField(pk)
-nickname            CharField(50, unique)  [required]
-display_name        CharField(120, blank=True)
-country             CharField(50)
-bio                 TextField(blank=True, null=True)
-rating              IntegerField(default=1500)
-points_total        IntegerField(default=0)
-total_submissions   IntegerField(default=0)
-accepted_submissions IntegerField(default=0)
-created_at          DateTimeField(auto_now_add=True)
-updated_at          DateTimeField(auto_now=True)
+# 🌐 Full API Endpoints (base: `/api/`) — Barcha example’lar bilan
 
-Delete rule:
-    ❌ Cannot delete if coder has submissions
-```
+> Har bir endpoint uchun: `Request` (curl yoki HTTP), `Success response` va `Possible error responses`.
 
 ---
-
-## `problems.models.Problem`
-```
-id                  AutoField
-contest             FK → Contest (CASCADE)
-title               CharField(200)
-code                CharField(20)  # e.g. A, B, C
-max_score           IntegerField(default=100)
-time_limit_ms       IntegerField(default=1000)
-memory_limit_kb     IntegerField(default=65536)
-created_at          DateTimeField(auto_now_add=True)
-
-Meta:
-    unique_together = (contest, code)
-
-Delete rule:
-    ❌ Cannot delete if submissions exist
-```
-
----
-
-## `submissions.models.Submission`
-```
-id              AutoField
-contest         FK → Contest (PROTECT)
-problem         FK → Problem (PROTECT)
-coder           FK → Coder (PROTECT)
-language        CharField(50)
-code            TextField
-status          CharField(choices=[
-                    'pending','accepted','wrong_answer',
-                    'runtime_error','time_limit',
-                    'compilation_error','partial'
-                ], default='pending')
-score           IntegerField(default=0)
-attempt_no      IntegerField(default=1)
-submitted_at    DateTimeField(auto_now_add=True)
-judged_at       DateTimeField(null=True, blank=True)
-
-Meta:
-    ordering = ['-submitted_at']
-
-Behavior:
-    - Judge update sets score/status/judged_at
-    - Recalculates coder stats
-```
-
----
-
-## `leaderboard.models.RatingChange`
-```
-id          AutoField
-coder       FK → Coder (CASCADE)
-contest     FK → Contest (CASCADE)
-old_rating  IntegerField
-new_rating  IntegerField
-delta       IntegerField
-reason      CharField(255)
-created_at  DateTimeField(auto_now_add=True)
-
-Index:
-    (coder, created_at)
-```
-
----
-
-# ⚙️ **Business Rules**
-
-### ✔ 1. Open API
-Test topshirig‘i sifatida barcha endpointlar autentifikatsiyasiz mavjud.
-
-### ✔ 2. Submission scoring
-```
-0 <= score <= problem.max_score
-accepted if status=="accepted" OR score == max_score
-attempt_no auto-increment per coder+problem
-```
-
-### ✔ 3. Contest Finalization
-```
-POST /api/contests/{id}/finalize/
-```
-- Recalculates all coder ratings  
-- Saves `RatingChange` records  
-- Sets `finalized=True`
-
-### ✔ 4. ELO-like Rating Calculation
-```
-max_points = sum(max_score)
-S_i = normalized performance
-E_ij = expected score vs each opponent
-delta_i = K * (S_i_total - E_i_total)
-clamped to ±400
-```
-
-### ✔ 5. Leaderboard Rules
-Sorted by:
-```
-1. points desc
-2. accepted_count desc
-3. first_accepted_time asc
-```
-
-### ✔ 6. Deletion Protection
-```
-Contest ❌ if submissions exist
-Coder   ❌ if submissions exist
-Problem ❌ if submissions exist
-Submission ✔ allowed (recalculate stats)
-```
-
-### ✔ 7. Filters & Search
-Examples:
-```
-/api/coders/?country=Uzbekistan&min_rating=1600&search=king
-/api/contests/?location=Tashkent&date_from=2026-01-01
-/api/submissions/?problem_code=A&status=accepted
-```
-
----
-
-# 🌐 **Full API Endpoints (base: /api/)**
 
 ## 🏆 Contests
-```
-POST    /api/contests/
-GET     /api/contests/
-GET     /api/contests/{id}/
-PATCH   /api/contests/{id}/
-DELETE  /api/contests/{id}/       (protected)
-POST    /api/contests/{id}/finalize/
-```
 
-## 👤 Coders
+### 1) Create Contest
+**Request**
 ```
-POST    /api/coders/
-GET     /api/coders/
-GET     /api/coders/{id}/
-PATCH   /api/coders/{id}/
-DELETE  /api/coders/{id}/          (protected)
-```
-
-## 📝 Problems
-```
-POST    /api/contests/{contest_id}/problems/
-GET     /api/contests/{contest_id}/problems/
-GET     /api/problems/{id}/
-PATCH   /api/problems/{id}/
-DELETE  /api/problems/{id}/         (protected)
-```
-
-## 📨 Submissions
-```
-POST    /api/submissions/
-GET     /api/submissions/
-GET     /api/submissions/{id}/
-PATCH   /api/submissions/{id}/judge/
-DELETE  /api/submissions/{id}/      (allowed)
-```
-
-## 📊 Leaderboards & Analytics
-```
-GET     /api/leaderboard/?contest_id={id}
-GET     /api/leaderboard/top/?contest_id={id}&limit={n}
-GET     /api/leaderboard/global/?country=&limit=
-GET     /api/analytics/contests/{id}/summary/
-```
-
----
-
-# 📘 **JSON Examples**
-
-## 1) Create Contest
-```json
 POST /api/contests/
+Content-Type: application/json
 
 {
   "title": "Tashkent Code Sprint 2026",
@@ -258,8 +51,11 @@ POST /api/contests/
 }
 ```
 
-**Response**
-```json
+**Success Response**
+```
+HTTP/1.1 201 Created
+Content-Type: application/json
+
 {
   "id": 12,
   "title": "Tashkent Code Sprint 2026",
@@ -268,15 +64,182 @@ POST /api/contests/
   "start_date": "2026-05-10T09:00:00Z",
   "end_date": "2026-05-10T15:00:00Z",
   "problems_count": 0,
-  "finalized": false
+  "finalized": false,
+  "created_at": "2025-11-24T11:00:00Z"
+}
+```
+
+**Validation Errors**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "end_date": ["End date must be greater than start date."]
 }
 ```
 
 ---
 
-## 2) Create Coder
-```json
+### 2) List Contests (with filtering, pagination)
+**Request**
+```
+GET /api/contests/?search=sprint&location=Tashkent&page=1&page_size=10
+```
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 12,
+      "title": "Tashkent Code Sprint 2026",
+      "location": "Tashkent, Uzbekistan",
+      "start_date": "2026-05-10T09:00:00Z",
+      "problems_count": 6
+    },
+    {
+      "id": 7,
+      "title": "Tashkent Code Sprint 2025",
+      "location": "Tashkent, Uzbekistan",
+      "start_date": "2025-05-10T09:00:00Z",
+      "problems_count": 8
+    }
+  ]
+}
+```
+
+---
+
+### 3) Retrieve Contest (detail)
+**Request**
+```
+GET /api/contests/12/
+```
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": 12,
+  "title": "Tashkent Code Sprint 2026",
+  "slug": "tashkent-code-sprint-2026",
+  "description": "One-day rapid contest",
+  "location": "Tashkent, Uzbekistan",
+  "start_date": "2026-05-10T09:00:00Z",
+  "end_date": "2026-05-10T15:00:00Z",
+  "problems_count": 6,
+  "finalized": false,
+  "created_at": "2025-11-24T11:00:00Z",
+  "problems": [
+    {"id":45,"code":"A","title":"Sum of Two","max_score":100},
+    {"id":46,"code":"B","title":"Array Max","max_score":100}
+  ]
+}
+```
+
+---
+
+### 4) Update Contest (PATCH)
+**Request**
+```
+PATCH /api/contests/12/
+Content-Type: application/json
+
+{
+  "description": "Updated description with more details"
+}
+```
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": 12,
+  "description": "Updated description with more details",
+  "updated_at": "2025-11-24T12:00:00Z"
+}
+```
+
+---
+
+### 5) Delete Contest (blocked if submissions exist)
+**Request**
+```
+DELETE /api/contests/12/
+```
+
+**Error Response (if submissions exist)**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": "Cannot delete contest with existing submissions. Tournament has active submissions."
+}
+```
+
+**Success Response (if no submissions)**
+```
+HTTP/1.1 204 No Content
+```
+
+---
+
+### 6) Finalize Contest (compute ratings)
+**Request**
+```
+POST /api/contests/12/finalize/
+Content-Type: application/json
+
+{ "force": true }
+```
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "contest_id": 12,
+  "finalized_at": "2025-11-24T14:00:00Z",
+  "processed_players": 120,
+  "rating_changes": [
+    { "coder_id": 3, "old_rating": 1803, "new_rating": 1878, "delta": 75 },
+    { "coder_id": 7, "old_rating": 2080, "new_rating": 2150, "delta": 70 }
+  ]
+}
+```
+
+**Error Response (if not allowed yet)**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": "Contest has not ended yet. Use force=true to override."
+}
+```
+
+---
+
+## 👤 Coders
+
+### 1) Create Coder
+**Request**
+```
 POST /api/coders/
+Content-Type: application/json
 
 {
   "nickname": "CodeMaster",
@@ -285,8 +248,11 @@ POST /api/coders/
 }
 ```
 
-**Response**
-```json
+**Success Response**
+```
+HTTP/1.1 201 Created
+Content-Type: application/json
+
 {
   "id": 3,
   "nickname": "CodeMaster",
@@ -295,15 +261,220 @@ POST /api/coders/
   "rating": 1500,
   "points_total": 0,
   "total_submissions": 0,
-  "accepted_submissions": 0
+  "accepted_submissions": 0,
+  "created_at": "2025-11-24T11:00:00Z"
+}
+```
+
+**Error Response (duplicate nickname)**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "nickname": ["This nickname is already taken."]
 }
 ```
 
 ---
 
-## 3) Create Submission
-```json
+### 2) List Coders (filters, ordering, pagination)
+**Request**
+```
+GET /api/coders/?country=Uzbekistan&min_rating=1600&search=master&ordering=-rating&page=1&page_size=20
+```
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "count": 5,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 3,
+      "nickname": "CodeMaster",
+      "country": "Uzbekistan",
+      "rating": 1850,
+      "total_games": 45,
+      "accepted_submissions": 340
+    }
+  ]
+}
+```
+
+---
+
+### 3) Retrieve Coder (with recent submissions & rating history)
+**Request**
+```
+GET /api/coders/3/
+```
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": 3,
+  "nickname": "CodeMaster",
+  "display_name": "Ali Akbar",
+  "country": "Uzbekistan",
+  "rating": 1850,
+  "points_total": 4250,
+  "total_submissions": 1200,
+  "accepted_submissions": 950,
+  "recent_submissions": [
+    {"id":1023,"problem":{"code":"A"},"status":"accepted","score":100,"submitted_at":"2025-11-24T12:00:00Z"}
+  ],
+  "rating_changes": [
+    {"contest_id":12,"old_rating":1803,"new_rating":1878,"delta":75,"created_at":"2025-11-24T14:00:00Z"}
+  ]
+}
+```
+
+---
+
+### 4) Update Coder
+**Request**
+```
+PATCH /api/coders/3/
+Content-Type: application/json
+
+{
+  "display_name": "Ali A."
+}
+```
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": 3,
+  "display_name": "Ali A.",
+  "updated_at": "2025-11-25T09:00:00Z"
+}
+```
+
+---
+
+### 5) Delete Coder (blocked if submissions)
+**Request**
+```
+DELETE /api/coders/3/
+```
+
+**Error Response (has submissions)**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": "Cannot delete coder. Player has 1200 recorded submissions."
+}
+```
+
+**Success Response (if no submissions)**
+```
+HTTP/1.1 204 No Content
+```
+
+---
+
+## 📝 Problems (nested under contest)
+
+### 1) Create Problem
+**Request**
+```
+POST /api/contests/12/problems/
+Content-Type: application/json
+
+{
+  "title": "Sum of Two",
+  "code": "A",
+  "max_score": 100,
+  "time_limit_ms": 1000
+}
+```
+
+**Success Response**
+```
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "id": 45,
+  "contest": 12,
+  "title": "Sum of Two",
+  "code": "A",
+  "max_score": 100,
+  "time_limit_ms": 1000,
+  "created_at": "2025-11-24T11:30:00Z"
+}
+```
+
+**Error Response (duplicate code in same contest)**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "code": ["Problem code must be unique per contest."]
+}
+```
+
+---
+
+### 2) List Problems
+**Request**
+```
+GET /api/contests/12/problems/
+```
+
+**Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+[
+  {"id":45,"code":"A","title":"Sum of Two","max_score":100},
+  {"id":46,"code":"B","title":"Array Max","max_score":100}
+]
+```
+
+---
+
+### 3) Delete Problem (blocked if submissions)
+**Request**
+```
+DELETE /api/problems/45/
+```
+
+**Error Response**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": "Cannot delete problem with existing submissions."
+}
+```
+
+---
+
+## 📨 Submissions
+
+### 1) Create Submission
+**Request**
+```
 POST /api/submissions/
+Content-Type: application/json
 
 {
   "contest": 12,
@@ -314,8 +485,11 @@ POST /api/submissions/
 }
 ```
 
-**Response**
-```json
+**Success Response**
+```
+HTTP/1.1 201 Created
+Content-Type: application/json
+
 {
   "id": 1023,
   "contest": { "id": 12, "title": "Tashkent Code Sprint 2026" },
@@ -329,47 +503,134 @@ POST /api/submissions/
 }
 ```
 
-### Judge update
-```json
-PATCH /api/submissions/1023/judge/
-
-{
-  "status": "accepted",
-  "score": 100,
-  "judged_at": "2025-11-24T12:00:30Z"
-}
-```
-
 ---
 
-## 4) Finalize Contest
-```json
-POST /api/contests/12/finalize/
-
-{ "force": true }
+### 2) List Submissions (filters)
+**Request**
+```
+GET /api/submissions/?contest=12&coder=3&status=accepted&problem_code=A&page=1
 ```
 
 **Response**
-```json
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
 {
-  "contest_id": 12,
-  "processed_players": 120,
-  "rating_changes": [
-    { "coder_id": 3, "old_rating": 1803, "new_rating": 1878, "delta": 75 },
-    { "coder_id": 7, "old_rating": 2080, "new_rating": 2150, "delta": 70 }
+  "count": 5,
+  "next": null,
+  "previous": null,
+  "results": [
+    {"id":1023,"problem":{"code":"A"},"status":"accepted","score":100,"submitted_at":"2025-11-24T12:00:00Z"}
   ]
 }
 ```
 
 ---
 
-## 5) Contest Leaderboard
-```json
+### 3) Retrieve Submission
+**Request**
+```
+GET /api/submissions/1023/
+```
+
+**Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": 1023,
+  "contest": { "id": 12, "title": "Tashkent Code Sprint 2026" },
+  "problem": { "id": 45, "code": "A", "title": "Sum of Two" },
+  "coder": { "id": 3, "nickname": "CodeMaster" },
+  "language": "python",
+  "status": "accepted",
+  "score": 100,
+  "attempt_no": 4,
+  "submitted_at": "2025-11-24T12:00:00Z",
+  "judged_at": "2025-11-24T12:00:30Z",
+  "judge_log": "All tests passed"
+}
+```
+
+---
+
+### 4) Judge Update (internal)
+> NOTE: This endpoint may be restricted to internal use in production; for test it can be public.
+
+**Request**
+```
+PATCH /api/submissions/1023/judge/
+Content-Type: application/json
+
+{
+  "status": "accepted",
+  "score": 100,
+  "judged_at": "2025-11-24T12:00:30Z",
+  "judge_log": "All tests passed"
+}
+```
+
+**Behavior**
+- Update submission status/score/judged_at
+- Recalculate `Coder.total_submissions`, `accepted_submissions`, `points_total`
+- Rebuild contest-level cached leaderboard or mark for recalculation
+
+**Success Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": 1023,
+  "status": "accepted",
+  "score": 100,
+  "judged_at": "2025-11-24T12:00:30Z"
+}
+```
+
+**Error Response (invalid score)**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "score": ["Score must be between 0 and problem.max_score (100)."]
+}
+```
+
+---
+
+### 5) Delete Submission
+**Request**
+```
+DELETE /api/submissions/1023/
+```
+
+**Success Response**
+```
+HTTP/1.1 204 No Content
+```
+
+**Behavior**
+- On delete, recalc coder counters and leaderboard
+
+---
+
+## 📊 Leaderboards & Analytics
+
+### 1) Contest Leaderboard
+**Request**
+```
 GET /api/leaderboard/?contest_id=12
 ```
 
 **Response**
-```json
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
 [
   {
     "rank": 1,
@@ -396,11 +657,126 @@ GET /api/leaderboard/?contest_id=12
 ]
 ```
 
+**Notes**
+- Sort: `points desc`, `accepted_count desc`, `first_accepted_time asc`
+
 ---
 
-# 🎯 Yakuniy izoh
-Ushbu README real kompaniyalar beradigan advanced backend test-vazifa formatida tuzilgan.  
-GitHub’ga tayyor, professional, to‘liq va tartibli.
+### 2) Top N Leaderboard (contest)
+**Request**
+```
+GET /api/leaderboard/top/?contest_id=12&limit=5
+```
 
-Agar xohlasang, shu loyihaning **Swagger**, **ERD diagramma**, **Postman collection**, yoki  
-**Django project skeleton**ni ham chiqarib beraman.
+**Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "contest_id": 12,
+  "contest_title": "Tashkent Code Sprint 2026",
+  "limit": 5,
+  "total_players": 120,
+  "leaderboard": [
+    { "rank": 1, "coder": "CodeMaster", "rating": 1878, "points": 375 },
+    { "rank": 2, "coder": "AlgoKing", "rating": 2150, "points": 360 }
+  ]
+}
+```
+
+---
+
+### 3) Global Rating Leaderboard
+**Request**
+```
+GET /api/leaderboard/global/?country=Uzbekistan&limit=20
+```
+
+**Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "total_players": 156,
+  "country": "Uzbekistan",
+  "leaderboard": [
+    { "rank": 1, "coder": "TopCoder", "rating": 2250, "total_games": 145 },
+    { "rank": 2, "coder": "CodeMaster", "rating": 1878, "total_games": 120 }
+  ]
+}
+```
+
+---
+
+### 4) Contest Analytics Summary
+**Request**
+```
+GET /api/analytics/contests/12/summary/
+```
+
+**Response**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "contest_id": 12,
+  "total_submissions": 2400,
+  "unique_coders": 120,
+  "avg_score_per_problem": { "A": 92.5, "B": 78.0, "C": 45.2 },
+  "acceptance_rate": 0.42,
+  "difficulty_histogram": { "easy": 2, "medium": 3, "hard": 1 }
+}
+```
+
+---
+
+# ✅ Common Error Responses (formats)
+
+**Validation error**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{ "field_name": ["error message"] }
+```
+
+**Not found**
+```
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+
+{ "detail": "Not found." }
+```
+
+**Protected delete**
+```
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{ "error": "Cannot delete X with existing submissions." }
+```
+
+---
+
+# 🔧 Implementation tips for candidate (short checklist)
+- Use `Django REST Framework` (ViewSets + Routers recommended).
+- `django-filter` + `SearchFilter` + `OrderingFilter` for list endpoints.
+- Use `UniqueConstraint` in `Meta.constraints`.
+- Use `transaction.atomic()` when updating multiple counters (judge updates, finalize).
+- Use Celery/RQ for background heavy tasks (judge simulation, finalize).
+- Add unit tests for rating algorithm, leaderboard ordering, deletion constraints.
+- Add OpenAPI docs (drf-spectacular or drf-yasg) + Postman collection.
+
+---
+
+# 🎯 Yordam kerakmi?
+Agar xohlasang, men hozir:
+- shu README asosida **Django project skeleton** (models, serializers, basic views/urls) yozib beraman; yoki
+- **Postman collection** va **drf-spectacular** konfiguratsiyasini tayyorlab beraman; yoki
+- **rating algorithm unit tests** yozib beraman.
+
+Qaysi birini avtomatik tarzda hozirroq chiqarib berishimni xohlaysan?  
+(So‘ra — men birdaniga to‘liq yozib beraman.)
