@@ -24,104 +24,176 @@ leaderboard/    — Rating change & leaderboards
 
 # 🧩 Models (to‘liq aniqlangan)
 
-## contests.models.Contest
-id              AutoField(pk)
-title           CharField(200)  [required]
-slug            SlugField(220, unique)
-description     TextField(null=True, blank=True)
-location        CharField(100)
-start_date      DateTimeField [required]
-end_date        DateTimeField [required]
-visibility      CharField(choices=['public','private'], default='public')
-finalized       BooleanField(default=False)
-problems_count  IntegerField(default=0)
-created_at      DateTimeField(auto_now_add=True)
-updated_at      DateTimeField(auto_now=True)
-
-Meta:
-    ordering = ['-start_date']
-
-Constraints:
-    end_date > start_date
-
-Delete rule:
-    ❌ Cannot delete if submissions exist
-
-
-## coders.models.Coder
-id                   AutoField(pk)
-nickname             CharField(50, unique)
-display_name         CharField(120, blank=True)
-country              CharField(50)
-bio                  TextField(blank=True, null=True)
-rating               IntegerField(default=1500)
-points_total         IntegerField(default=0)
-total_submissions    IntegerField(default=0)
-accepted_submissions IntegerField(default=0)
-created_at           DateTimeField(auto_now_add=True)
-updated_at           DateTimeField(auto_now=True)
-
-Delete rule:
-    ❌ Cannot delete if coder has submissions
-
-
-## problems.models.Problem
-id                  AutoField
-contest             FK → Contest (CASCADE)
-title               CharField(200)
-code                CharField(20)  # e.g. A, B, C
-max_score           IntegerField(default=100)
-time_limit_ms       IntegerField(default=1000)
-memory_limit_kb     IntegerField(default=65536)
-created_at          DateTimeField(auto_now_add=True)
-
-Meta:
-    unique_together = (contest, code)
-
-Delete rule:
-    ❌ Cannot delete if submissions exist
-
-
-## submissions.models.Submission
-id              AutoField
-contest         FK → Contest (PROTECT)
-problem         FK → Problem (PROTECT)
-coder           FK → Coder (PROTECT)
-language        CharField(50)
-code            TextField
-status          CharField(choices=[
-                    ('pending','Pending'),
-                    ('accepted','Accepted'),
-                    ('wrong_answer','Wrong Answer'),
-                    ('runtime_error','Runtime Error'),
-                    ('time_limit','Time Limit'),
-                    ('compilation_error','Compilation Error'),
-                    ('partial','Partial Score')
-                ], default='pending')
-score           IntegerField(default=0)
-attempt_no      IntegerField(default=1)
-submitted_at    DateTimeField(auto_now_add=True)
-judged_at       DateTimeField(null=True, blank=True)
-
-Meta:
-    ordering = ['-submitted_at']
-
-
-## leaderboard.models.RatingChange
-id          AutoField
-coder       FK → Coder (CASCADE)
-contest     FK → Contest (CASCADE)
-old_rating  IntegerField
-new_rating  IntegerField
-delta       IntegerField
-reason      CharField(255)
-created_at  DateTimeField(auto_now_add=True)
-
-Index:
-    (coder, created_at)
-
 
 ---
+
+## 🧩 Models
+
+### contests.models.Contest
+| Field           | Type               | Notes |
+|-----------------|------------------|-------|
+| id              | AutoField (PK)     |       |
+| title           | CharField(200)    | required |
+| slug            | SlugField(220)    | unique |
+| description     | TextField         | null=True, blank=True |
+| location        | CharField(100)    |       |
+| start_date      | DateTimeField     | required |
+| end_date        | DateTimeField     | required, must be > start_date |
+| visibility      | CharField         | choices=['public','private'], default='public' |
+| finalized       | BooleanField      | default=False |
+| problems_count  | IntegerField      | default=0 |
+| created_at      | DateTimeField     | auto_now_add=True |
+| updated_at      | DateTimeField     | auto_now=True |
+
+**Meta:** `ordering = ['-start_date']`  
+**Delete rule:** ❌ Cannot delete if submissions exist  
+
+---
+
+### coders.models.Coder
+| Field                   | Type         | Notes |
+|-------------------------|-------------|-------|
+| id                      | AutoField   | PK |
+| nickname                | CharField(50) | unique |
+| display_name            | CharField(120) | blank=True |
+| country                 | CharField(50)  |       |
+| bio                     | TextField   | blank=True, null=True |
+| rating                  | IntegerField | default=1500 |
+| points_total            | IntegerField | default=0 |
+| total_submissions       | IntegerField | default=0 |
+| accepted_submissions    | IntegerField | default=0 |
+| created_at              | DateTimeField | auto_now_add=True |
+| updated_at              | DateTimeField | auto_now=True |
+
+**Delete rule:** ❌ Cannot delete if coder has submissions
+
+---
+
+### problems.models.Problem
+| Field           | Type          | Notes |
+|-----------------|---------------|-------|
+| id              | AutoField     |       |
+| contest         | FK → Contest  | CASCADE |
+| title           | CharField(200)|       |
+| code            | CharField(20) | unique per contest (A, B, C…) |
+| max_score       | IntegerField  | default=100 |
+| time_limit_ms   | IntegerField  | default=1000 |
+| memory_limit_kb | IntegerField  | default=65536 |
+| created_at      | DateTimeField | auto_now_add=True |
+
+**Meta:** `unique_together = (contest, code)`  
+**Delete rule:** ❌ Cannot delete if submissions exist  
+
+---
+
+### submissions.models.Submission
+| Field         | Type       | Notes |
+|---------------|-----------|-------|
+| id            | AutoField |       |
+| contest       | FK → Contest | PROTECT |
+| problem       | FK → Problem | PROTECT |
+| coder         | FK → Coder | PROTECT |
+| language      | CharField(50) |       |
+| code          | TextField |       |
+| status        | CharField | choices=['pending','accepted','wrong_answer','runtime_error','time_limit','compilation_error','partial'], default='pending' |
+| score         | IntegerField | default=0 |
+| attempt_no    | IntegerField | default=1 |
+| submitted_at  | DateTimeField | auto_now_add=True |
+| judged_at     | DateTimeField | null=True, blank=True |
+
+**Meta:** `ordering = ['-submitted_at']`
+
+---
+
+### leaderboard.models.RatingChange
+| Field      | Type       | Notes |
+|------------|-----------|-------|
+| id         | AutoField |       |
+| coder      | FK → Coder | CASCADE |
+| contest    | FK → Contest | CASCADE |
+| old_rating | IntegerField |       |
+| new_rating | IntegerField |       |
+| delta      | IntegerField |       |
+| reason     | CharField(255) |       |
+| created_at | DateTimeField | auto_now_add=True |
+
+**Index:** `(coder, created_at)`
+
+---
+
+## 🌐 Full API Endpoints (base: `/api/`)
+
+Barcha endpointlar **JSON** formatida ishlaydi.  
+Har bir endpoint uchun:
+- `Request` (curl yoki HTTP)
+- `Success response`
+- `Possible error responses`
+
+---
+
+### 🏆 Contests
+- `POST /api/contests/` — Create contest  
+- `GET /api/contests/` — List contests (filter/pagination)  
+- `GET /api/contests/{id}/` — Retrieve contest  
+- `PATCH /api/contests/{id}/` — Update contest  
+- `DELETE /api/contests/{id}/` — Delete contest (blocked if submissions exist)  
+- `POST /api/contests/{id}/finalize/` — Finalize contest, compute ratings  
+
+### 👤 Coders
+- `POST /api/coders/` — Create coder  
+- `GET /api/coders/` — List coders (filter/order/pagination)  
+- `GET /api/coders/{id}/` — Retrieve coder (with recent submissions & rating history)  
+- `PATCH /api/coders/{id}/` — Update coder  
+- `DELETE /api/coders/{id}/` — Delete coder (blocked if submissions exist)  
+
+### 📝 Problems
+- `POST /api/contests/{contest_id}/problems/` — Create problem  
+- `GET /api/contests/{contest_id}/problems/` — List problems  
+- `DELETE /api/problems/{id}/` — Delete problem (blocked if submissions exist)  
+
+### 📨 Submissions
+- `POST /api/submissions/` — Create submission  
+- `GET /api/submissions/` — List submissions (filters)  
+- `GET /api/submissions/{id}/` — Retrieve submission  
+- `PATCH /api/submissions/{id}/judge/` — Judge update (internal)  
+- `DELETE /api/submissions/{id}/` — Delete submission  
+
+### 📊 Leaderboards & Analytics
+- `GET /api/leaderboard/?contest_id={id}` — Contest leaderboard  
+- `GET /api/leaderboard/top/?contest_id={id}&limit=N` — Top N leaderboard  
+- `GET /api/leaderboard/global/?country=X&limit=N` — Global rating leaderboard  
+- `GET /api/analytics/contests/{id}/summary/` — Contest analytics summary  
+
+---
+
+## ✅ Common Error Responses
+- **Validation error:** 400 Bad Request `{ "field_name": ["error message"] }`  
+- **Not found:** 404 Not Found `{ "detail": "Not found." }`  
+- **Protected delete:** 400 Bad Request `{ "error": "Cannot delete X with existing submissions." }`  
+
+---
+
+## 🔧 Implementation Tips
+- Use **Django REST Framework** (ViewSets + Routers recommended)  
+- `django-filter` + `SearchFilter` + `OrderingFilter` for list endpoints  
+- Use `UniqueConstraint` in `Meta.constraints`  
+- Wrap multiple updates with `transaction.atomic()`  
+- Use Celery/RQ for background tasks (judge simulation, finalize)  
+- Add unit tests for rating algorithm, leaderboard ordering, deletion constraints  
+- Add OpenAPI docs (`drf-spectacular` or `drf-yasg`) + Postman collection  
+
+---
+
+## 🎯 Next Steps
+Agar xohlasang, men hozir:
+1. Shu README asosida **Django project skeleton** (models, serializers, basic views/urls) yozib bera olaman  
+2. **Postman collection** va **drf-spectacular** konfiguratsiyasini tayyorlab bera olaman  
+3. **Rating algorithm unit tests** yozib bera olaman  
+
+---
+
+> Tayyor README.md fayli endi to‘liq, chiroyli va GitHub-ready holatda.
+
 
 # 🌐 Full API Endpoints (base: `/api/`) — Barcha example’lar bilan
 
