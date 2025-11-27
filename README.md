@@ -22,9 +22,104 @@ leaderboard/    — Rating change & leaderboards
 
 # 🧩 Models (xulosa)
 
-> Timestamps: barcha vaqtlar UTC, API’da ISO-8601 qaytadi.
+# 🧩 Models (to‘liq aniqlangan)
 
-(Full model tafsilotlari READMEning yuqorisida berilgan. Quyida endpointlarga oid misollar batafsil.)
+## contests.models.Contest
+id              AutoField(pk)
+title           CharField(200)  [required]
+slug            SlugField(220, unique)
+description     TextField(null=True, blank=True)
+location        CharField(100)
+start_date      DateTimeField [required]
+end_date        DateTimeField [required]
+visibility      CharField(choices=['public','private'], default='public')
+finalized       BooleanField(default=False)
+problems_count  IntegerField(default=0)
+created_at      DateTimeField(auto_now_add=True)
+updated_at      DateTimeField(auto_now=True)
+
+Meta:
+    ordering = ['-start_date']
+
+Constraints:
+    end_date > start_date
+
+Delete rule:
+    ❌ Cannot delete if submissions exist
+
+
+## coders.models.Coder
+id                   AutoField(pk)
+nickname             CharField(50, unique)
+display_name         CharField(120, blank=True)
+country              CharField(50)
+bio                  TextField(blank=True, null=True)
+rating               IntegerField(default=1500)
+points_total         IntegerField(default=0)
+total_submissions    IntegerField(default=0)
+accepted_submissions IntegerField(default=0)
+created_at           DateTimeField(auto_now_add=True)
+updated_at           DateTimeField(auto_now=True)
+
+Delete rule:
+    ❌ Cannot delete if coder has submissions
+
+
+## problems.models.Problem
+id                  AutoField
+contest             FK → Contest (CASCADE)
+title               CharField(200)
+code                CharField(20)  # e.g. A, B, C
+max_score           IntegerField(default=100)
+time_limit_ms       IntegerField(default=1000)
+memory_limit_kb     IntegerField(default=65536)
+created_at          DateTimeField(auto_now_add=True)
+
+Meta:
+    unique_together = (contest, code)
+
+Delete rule:
+    ❌ Cannot delete if submissions exist
+
+
+## submissions.models.Submission
+id              AutoField
+contest         FK → Contest (PROTECT)
+problem         FK → Problem (PROTECT)
+coder           FK → Coder (PROTECT)
+language        CharField(50)
+code            TextField
+status          CharField(choices=[
+                    ('pending','Pending'),
+                    ('accepted','Accepted'),
+                    ('wrong_answer','Wrong Answer'),
+                    ('runtime_error','Runtime Error'),
+                    ('time_limit','Time Limit'),
+                    ('compilation_error','Compilation Error'),
+                    ('partial','Partial Score')
+                ], default='pending')
+score           IntegerField(default=0)
+attempt_no      IntegerField(default=1)
+submitted_at    DateTimeField(auto_now_add=True)
+judged_at       DateTimeField(null=True, blank=True)
+
+Meta:
+    ordering = ['-submitted_at']
+
+
+## leaderboard.models.RatingChange
+id          AutoField
+coder       FK → Coder (CASCADE)
+contest     FK → Contest (CASCADE)
+old_rating  IntegerField
+new_rating  IntegerField
+delta       IntegerField
+reason      CharField(255)
+created_at  DateTimeField(auto_now_add=True)
+
+Index:
+    (coder, created_at)
+
 
 ---
 
