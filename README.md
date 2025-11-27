@@ -185,3 +185,179 @@
 
 ### 1) Create Contest
 **Request**
+
+POST /api/contests/
+Content-Type: application/json
+
+{
+"title": "Tashkent Code Sprint 2026",
+"location": "Tashkent, Uzbekistan",
+"start_date": "2026-05-10T09:00:00Z",
+"end_date": "2026-05-10T15:00:00Z",
+"description": "One-day rapid contest"
+}
+
+
+**Response**
+
+
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+"id": 12,
+"title": "Tashkent Code Sprint 2026",
+"slug": "tashkent-code-sprint-2026",
+"location": "Tashkent, Uzbekistan",
+"start_date": "2026-05-10T09:00:00Z",
+"end_date": "2026-05-10T15:00:00Z",
+"problems_count": 0,
+"finalized": false,
+"created_at": "2025-11-24T11:00:00Z"
+}
+
+
+---
+
+### 2) Create Coder
+**Request**
+
+
+POST /api/coders/
+Content-Type: application/json
+
+{ "nickname": "CodeMaster", "display_name": "Ali Akbar", "country": "Uzbekistan" }
+
+
+**Response**
+
+
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+"id": 3,
+"nickname": "CodeMaster",
+"display_name": "Ali Akbar",
+"country": "Uzbekistan",
+"rating": 1500,
+"points_total": 0,
+"total_submissions": 0,
+"accepted_submissions": 0,
+"created_at": "2025-11-24T11:00:00Z"
+}
+
+
+---
+
+### 3) Create Submission (initial)
+**Request**
+
+
+POST /api/submissions/
+Content-Type: application/json
+
+{
+"contest": 12,
+"problem": 45,
+"coder": 3,
+"language": "python",
+"code": "print(sum(map(int, input().split())))"
+}
+
+
+**Response**
+
+
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+"id": 1023,
+"contest": { "id": 12, "title": "Tashkent Code Sprint 2026" },
+"problem": { "id": 45, "code": "A", "title": "Sum of Two" },
+"coder": { "id": 3, "nickname": "CodeMaster" },
+"language": "python",
+"status": "pending",
+"score": 0,
+"attempt_no": 4,
+"submitted_at": "2025-11-24T12:00:00Z"
+}
+
+
+**Judge update (internal)**  
+`PATCH /api/submissions/1023/judge/` body:
+
+
+{ "status": "accepted", "score": 100, "judged_at": "2025-11-24T12:00:30Z" }
+
+
+After judge, coder counters increment and `points_total` updates.
+
+---
+
+### 4) Finalize contest (compute rating changes)
+**Request**
+
+
+POST /api/contests/12/finalize/
+Content-Type: application/json
+{ "force": true }
+
+
+**Response**
+
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+"contest_id": 12,
+"finalized_at": "2025-11-24T14:00:00Z",
+"processed_players": 120,
+"rating_changes": [
+{ "coder_id": 3, "old_rating": 1803, "new_rating": 1878, "delta": 75 },
+{ "coder_id": 7, "old_rating": 2080, "new_rating": 2150, "delta": 70 }
+]
+}
+
+
+---
+
+### 5) Contest leaderboard
+**Request**
+
+
+GET /api/leaderboard/?contest_id=12
+
+
+**Response**
+
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+[
+{
+"rank": 1,
+"coder": "CodeMaster",
+"coder_id": 3,
+"country": "Uzbekistan",
+"rating": 1878,
+"points": 375,
+"accepted": 5,
+"attempts": 12,
+"rating_change": 75
+},
+{
+"rank": 2,
+"coder": "AlgoKing",
+"coder_id": 22,
+"country": "Kazakhstan",
+"rating": 2150,
+"points": 360,
+"accepted": 5,
+"attempts": 10,
+"rating_change": 70
+}
+]
